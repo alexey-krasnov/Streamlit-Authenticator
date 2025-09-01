@@ -405,6 +405,7 @@ class Authenticate:
             if st.session_state.get('authentication_status'):
                 self.authentication_controller.logout()
                 self.cookie_controller.delete_cookie()
+
     def register_user(self, location: Literal['main', 'sidebar'] = 'main',
                       pre_authorized: Optional[List[str]] = None,
                       domains: Optional[List[str]] = None, fields: Optional[Dict[str, str]] = None,
@@ -414,7 +415,7 @@ class Authenticate:
                       key: str = 'Register user', callback: Optional[Callable] = None
                       ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
-        Renders a register new user widget.
+        Renders a register new user widget with proper tab order.
 
         Parameters
         ----------
@@ -455,54 +456,82 @@ class Authenticate:
                                    requires a list of pre-authorized emails. For further
                                    information please refer to {params.REGISTER_USER_LINK}.""")
         if fields is None:
-            fields = {'Form name':'Register user', 'First name':'First name',
-                      'Last name':'Last name', 'Email':'Email', 'Username':'Username',
-                      'Password':'Password', 'Repeat password':'Repeat password',
-                      'Password hint':'Password hint', 'Captcha':'Captcha', 'Register':'Register',
-                      'Dialog name':'Verification code', 'Code':'Code', 'Submit':'Submit',
-                      'Error':'Code is incorrect'}
+            fields = {'Form name': 'Register user', 'First name': 'First name',
+                      'Last name': 'Last name', 'Email': 'Email', 'Username': 'Username',
+                      'Password': 'Password', 'Repeat password': 'Repeat password',
+                      'Password hint': 'Password hint', 'Captcha': 'Captcha', 'Register': 'Register',
+                      'Dialog name': 'Verification code', 'Code': 'Code', 'Submit': 'Submit',
+                      'Error': 'Code is incorrect'}
         if location not in ['main', 'sidebar']:
             raise ValueError("Location must be one of 'main' or 'sidebar'")
         if location == 'main':
             register_user_form = st.form(key=key, clear_on_submit=clear_on_submit)
         elif location == 'sidebar':
             register_user_form = st.sidebar.form(key=key, clear_on_submit=clear_on_submit)
+
         register_user_form.subheader('Register user' if 'Form name' not in fields
                                      else fields['Form name'])
-        col1_1, col2_1 = register_user_form.columns(2)
-        new_first_name = col1_1.text_input('First name' if 'First name' not in fields
-                                         else fields['First name'], autocomplete='off')
-        new_last_name = col2_1.text_input('Last name' if 'Last name' not in fields
-                                        else fields['Last name'], autocomplete='off')
-        if merge_username_email:
-            new_email = register_user_form.text_input('Email' if 'Email' not in fields
-                                        else fields['Email'], autocomplete='off')
-            new_username = new_email
-        else:
-            new_email = col1_1.text_input('Email' if 'Email' not in fields
-                                        else fields['Email'], autocomplete='off')
-            new_username = col2_1.text_input('Username' if 'Username' not in fields
-                                        else fields['Username'], autocomplete='off')
-        col1_2, col2_2 = register_user_form.columns(2)
-        password_instructions = self.attrs.get('password_instructions',
-                                               params.PASSWORD_INSTRUCTIONS)
-        new_password = col1_2.text_input('Password' if 'Password' not in fields
-                                       else fields['Password'], type='password',
-                                       help=password_instructions, autocomplete='off')
-        new_password_repeat = col2_2.text_input('Repeat password' if 'Repeat password' not in fields
-                                              else fields['Repeat password'], type='password',
-                                              autocomplete='off')
+
+        # Create containers to control tab order while maintaining visual layout
+        with register_user_form.container():
+            # Row 1: First Name and Last Name
+            col1_1, col2_1 = st.columns(2)
+            with col1_1:
+                new_first_name = st.text_input('First name' if 'First name' not in fields
+                                               else fields['First name'],
+                                               autocomplete='off', key=f"{key}_first_name")
+            with col2_1:
+                new_last_name = st.text_input('Last name' if 'Last name' not in fields
+                                              else fields['Last name'],
+                                              autocomplete='off', key=f"{key}_last_name")
+
+        with register_user_form.container():
+            # Row 2: Email and Username
+            if merge_username_email:
+                new_email = st.text_input('Email' if 'Email' not in fields
+                                          else fields['Email'],
+                                          autocomplete='off', key=f"{key}_email")
+                new_username = new_email
+            else:
+                col1_2, col2_2 = st.columns(2)
+                with col1_2:
+                    new_email = st.text_input('Email' if 'Email' not in fields
+                                              else fields['Email'],
+                                              autocomplete='off', key=f"{key}_email")
+                with col2_2:
+                    new_username = st.text_input('Username' if 'Username' not in fields
+                                                 else fields['Username'],
+                                                 autocomplete='off', key=f"{key}_username")
+
+        with register_user_form.container():
+            # Row 3: Password and Repeat Password
+            col1_3, col2_3 = st.columns(2)
+            password_instructions = self.attrs.get('password_instructions',
+                                                   params.PASSWORD_INSTRUCTIONS)
+            with col1_3:
+                new_password = st.text_input('Password' if 'Password' not in fields
+                                             else fields['Password'], type='password',
+                                             help=password_instructions, autocomplete='off',
+                                             key=f"{key}_password")
+            with col2_3:
+                new_password_repeat = st.text_input('Repeat password' if 'Repeat password' not in fields
+                                                    else fields['Repeat password'], type='password',
+                                                    autocomplete='off', key=f"{key}_password_repeat")
+
+        # Full-width fields
         if password_hint:
             password_hint = register_user_form.text_input('Password hint' if 'Password hint' not in
-                                                        fields else fields['Password hint'],
-                                                        autocomplete='off')
+                                                                             fields else fields['Password hint'],
+                                                          autocomplete='off', key=f"{key}_password_hint")
+
         entered_captcha = None
         if captcha:
             entered_captcha = register_user_form.text_input('Captcha' if 'Captcha' not in fields
                                                             else fields['Captcha'],
-                                                            autocomplete='off').strip()
+                                                            autocomplete='off', key=f"{key}_captcha").strip()
             register_user_form.image(Helpers.generate_captcha('register_user_captcha',
                                                               self.secret_key))
+
         if register_user_form.form_submit_button('Register' if 'Register' not in fields
                                                  else fields['Register']):
             if two_factor_auth:
